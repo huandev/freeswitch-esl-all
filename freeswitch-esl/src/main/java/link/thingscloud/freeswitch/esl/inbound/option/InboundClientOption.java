@@ -19,6 +19,7 @@ package link.thingscloud.freeswitch.esl.inbound.option;
 
 import link.thingscloud.freeswitch.esl.IEslEventListener;
 import link.thingscloud.freeswitch.esl.inbound.listener.EventListener;
+import link.thingscloud.freeswitch.esl.ServerConnectionListener;
 import link.thingscloud.freeswitch.esl.inbound.listener.ServerOptionListener;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
@@ -45,11 +46,15 @@ public class InboundClientOption {
     private int defaultTimeoutSeconds = 5;
     private String defaultPassword = "ClueCon";
 
+    private int readTimeoutSeconds = 30;
+    private int readerIdleTimeSeconds = 25;
+
     private boolean disablePublicExecutor = false;
     private boolean performance = false;
     private long performanceCostTime = 200;
 
     private ServerOptionListener serverOptionListener = null;
+    private ServerConnectionListener serverConnectionListener = null;
     private List<ServerOption> serverOptions = new ArrayList<>();
     private ServerAddrOption serverAddrOption = new ServerAddrOption(serverOptions);
 
@@ -200,6 +205,49 @@ public class InboundClientOption {
 
 
     /**
+     * <p>readTimeoutSeconds.</p>
+     *
+     * @return a {@link java.lang.Integer} object.
+     */
+    public int readTimeoutSeconds() {
+        return readTimeoutSeconds;
+    }
+
+    /**
+     * <p>readTimeoutSeconds.</p>
+     *
+     * @param readTimeoutSeconds a {@link java.lang.Integer} object.
+     * @return a {@link link.thingscloud.freeswitch.esl.inbound.option.InboundClientOption} object.
+     */
+    public InboundClientOption readTimeoutSeconds(int readTimeoutSeconds) {
+        this.readTimeoutSeconds = readTimeoutSeconds;
+        return this;
+    }
+
+    /**
+     * <p>readerIdleTimeSeconds.</p>
+     *
+     * @return a {@link java.lang.Integer} object.
+     */
+    public int readerIdleTimeSeconds() {
+        return readerIdleTimeSeconds;
+    }
+
+    /**
+     * <p>readerIdleTimeSeconds.</p>
+     * <p>
+     * 读空闲时长
+     *
+     * @param readerIdleTimeSeconds a {@link java.lang.Integer} object.
+     * @return a {@link link.thingscloud.freeswitch.esl.inbound.option.InboundClientOption} object.
+     */
+    public InboundClientOption readerIdleTimeSeconds(int readerIdleTimeSeconds) {
+        this.readerIdleTimeSeconds = readerIdleTimeSeconds;
+        return this;
+    }
+
+
+    /**
      * <p>
      * disable public executor thread pool then message thread safety.
      * 处理事件消息时不使用独立线程池，可以使得消息线程安全
@@ -282,6 +330,26 @@ public class InboundClientOption {
      */
     public InboundClientOption serverOptionListener(ServerOptionListener serverOptionListener) {
         this.serverOptionListener = serverOptionListener;
+        return this;
+    }
+
+    /**
+     * <p>serverConnectionListener.</p>
+     *
+     * @return a {@link link.thingscloud.freeswitch.esl.inbound.listener.ServerOptionListener} object.
+     */
+    public ServerConnectionListener serverConnectionListener() {
+        return serverConnectionListener;
+    }
+
+    /**
+     * <p>serverConnectionListener.</p>
+     *
+     * @param serverConnectionListener a {@link link.thingscloud.freeswitch.esl.ServerConnectionListener} object.
+     * @return a {@link link.thingscloud.freeswitch.esl.inbound.option.InboundClientOption} object.
+     */
+    public InboundClientOption serverConnectionListener(ServerConnectionListener serverConnectionListener) {
+        this.serverConnectionListener = serverConnectionListener;
         return this;
     }
 

@@ -21,6 +21,9 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.timeout.IdleState;
+import io.netty.handler.timeout.IdleStateEvent;
+import link.thingscloud.freeswitch.esl.helper.EslHelper;
 import link.thingscloud.freeswitch.esl.inbound.listener.ChannelEventListener;
 import link.thingscloud.freeswitch.esl.transport.event.EslEvent;
 import link.thingscloud.freeswitch.esl.transport.message.EslHeaders;
@@ -57,11 +60,13 @@ public class InboundChannelHandler extends SimpleChannelInboundHandler<EslMessag
     private Channel channel;
     private String remoteAddr;
 
+    private final boolean isTraceEnabled = log.isTraceEnabled();
+
     /**
      * <p>Constructor for InboundChannelHandler.</p>
      *
-     * @param listener       a {@link link.thingscloud.freeswitch.esl.inbound.listener.ChannelEventListener} object.
-     * @param publicExecutor a {@link java.util.concurrent.ExecutorService} object.
+     * @param listener              a {@link link.thingscloud.freeswitch.esl.inbound.listener.ChannelEventListener} object.
+     * @param publicExecutor        a {@link java.util.concurrent.ExecutorService} object.
      * @param disablePublicExecutor a boolean.
      */
     public InboundChannelHandler(ChannelEventListener listener, ExecutorService publicExecutor, boolean disablePublicExecutor) {
@@ -70,25 +75,57 @@ public class InboundChannelHandler extends SimpleChannelInboundHandler<EslMessag
         this.disablePublicExecutor = disablePublicExecutor;
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         super.channelActive(ctx);
         this.channel = ctx.channel();
         this.remoteAddr = RemotingUtil.socketAddress2String(channel.remoteAddress());
+        log.debug("channelActive remoteAddr : {}", remoteAddr);
         listener.onChannelActive(remoteAddr, this);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
+        log.debug("channelInactive remoteAddr : {}", remoteAddr);
         listener.onChannelClosed(remoteAddr);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        if (evt instanceof IdleStateEvent) {
+            if (((IdleStateEvent) evt).state() == IdleState.READER_IDLE) {
+                log.debug("userEventTriggered remoteAddr : {}, evt state : {} ", remoteAddr, ((IdleStateEvent) evt).state());
+                publicExecutor.execute(() -> sendSyncSingleLineCommand("status"));
+            }
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        log.error("exceptionCaught remoteAddr : {}, cause : ", remoteAddr, cause);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, EslMessage msg) {
+        if (isTraceEnabled) {
+            log.trace("channelRead0 esl message : {}", EslHelper.formatEslMessage(msg));
+        }
         String contentType = msg.getContentType();
         if (contentType.equals(EslHeaders.Value.TEXT_EVENT_PLAIN) ||
                 contentType.equals(EslHeaders.Value.TEXT_EVENT_XML)) {
@@ -143,6 +180,9 @@ public class InboundChannelHandler extends SimpleChannelInboundHandler<EslMessag
      * @return the {@link link.thingscloud.freeswitch.esl.transport.message.EslMessage} attached to this command's callback
      */
     public EslMessage sendSyncSingleLineCommand(final String command) {
+        if (isTraceEnabled) {
+            log.trace("sendSyncSingleLineCommand command : {}", command);
+        }
         SyncCallback callback = new SyncCallback();
         syncLock.lock();
         try {
@@ -173,7 +213,9 @@ public class InboundChannelHandler extends SimpleChannelInboundHandler<EslMessag
             sb.append(LINE_TERMINATOR);
         }
         sb.append(LINE_TERMINATOR);
-
+        if (isTraceEnabled) {
+            log.trace("sendSyncMultiLineCommand command : {}", sb.toString());
+        }
         syncLock.lock();
         try {
             syncCallbacks.add(callback);
@@ -198,9 +240,13 @@ public class InboundChannelHandler extends SimpleChannelInboundHandler<EslMessag
          * job request will be returned by the server as an async event.
          */
         EslMessage response = sendSyncSingleLineCommand(command);
+        if (isTraceEnabled) {
+            log.trace("sendAsyncCommand command : {}, response : {}", command, response);
+        }
         if (response.hasHeader(EslHeaders.Name.JOB_UUID)) {
             return response.getHeaderValue(EslHeaders.Name.JOB_UUID);
         } else {
+            log.warn("sendAsyncCommand command : {}, response : {}", command, EslHelper.formatEslMessage(response));
             throw new IllegalStateException("Missing Job-UUID header in bgapi response");
         }
     }
